@@ -4,6 +4,9 @@
 
 This repository contains Terraform code to manage AWS Identity and Access Management (IAM) resources. It implements infrastructure as code (IaC) principles to ensure consistent, version-controlled, and automated management of AWS permissions and security policies.
 
+![AWS IAM User Groups created by Terraform](docs/IAM_created_groups.png)
+_Example of IAM user groups created after applying this Terraform configuration_
+
 ## Table of Contents
 
 - [Purpose](#purpose)
