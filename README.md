@@ -34,18 +34,35 @@ Managing AWS IAM through Terraform provides several benefits:
 
 ## Repository Structure
 
-```bash
+```
 aws-iam-config/
-├── modules/ # Reusable IAM component definitions
-│ ├── roles/ # Common IAM role definitions
-│ ├── policies/ # Reusable policy documents
-│ └── groups/ # User group configurations
-├── environments/ # Environment-specific configurations
-│ ├── dev/ # Development environment
-│ ├── staging/ # Staging environment
-│ └── prod/ # Production environment
-├── examples/ # Example implementations
-└── tests/ # Automated policy validation tests
+├── docs/ # Documentation files
+│   ├── IAM_created_groups.png # Screenshot of created IAM groups
+│   └── README.md
+├── groups/ # IAM user group definitions
+│   ├── analysts.tf
+│   ├── developers.tf
+│   ├── finance.tf
+│   ├── operations.tf
+│   ├── outputs.tf
+│   ├── policies.tf
+│   └── variables.tf
+├── policies/ # IAM policy definitions
+│   ├── analyst_policies.tf
+│   ├── developer_policies.tf
+│   ├── finance_policies.tf
+│   ├── operations_policies.tf
+│   ├── README.md
+│   └── variables.tf
+├── security/ # Security configurations
+│   ├── mfa_policy.tf
+│   └── password_policy.tf
+├── terraform-iam-config/ # Main Terraform configuration
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── providers.tf
+│   ├── variables.tf
+│   └── terraform.lock.hcl
 ```
 
 ## Getting Started
@@ -145,4 +162,7 @@ The IAM configurations should be regularly reviewed and updated:
 
 ---
 
-For questions or support, contact the Cloud Infrastructure team.
+For questions or comments, send me a message on [LinkedIn](https://www.linkedin.com/in/simoncheam/).
+
+Come Visit Me: [simoncheam.dev](https://simoncheam.dev)
+Connect With Me On LinkedIn: [https://www.linkedin.com/in/simoncheam/](https://www.linkedin.com/in/simoncheam/)
