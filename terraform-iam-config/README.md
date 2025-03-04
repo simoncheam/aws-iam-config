@@ -1,4 +1,4 @@
-# AWS IAM Configuration - testing
+# AWS IAM Configuration
 
 This directory contains the Terraform configuration for managing AWS IAM resources.
 
