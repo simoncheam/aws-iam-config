@@ -25,7 +25,7 @@ resource "aws_iam_user" "example_developer" {
 
 resource "aws_iam_user_group_membership" "example_developer" {
   user   = aws_iam_user.example_developer.name
-  groups = [aws_iam_group.developers.name]
+  groups = [module.groups.developers_group_name]
 }
 
 # Add more users as needed
