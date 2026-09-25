@@ -1,30 +1,14 @@
-# analysts.tf
-
+# groups/analysts.tf
 
 resource "aws_iam_group" "analysts" {
   name = "${var.environment}-analysts"
   path = "/groups/"
 }
 
-# Policy attachments for analysts group
-resource "aws_iam_group_policy_attachment" "analyst_s3_readonly_policy" {
+# Attach every policy passed in from the policies module
+resource "aws_iam_group_policy_attachment" "analysts" {
+  for_each = var.analyst_policy_arns
+
   group      = aws_iam_group.analysts.name
-  policy_arn = aws_iam_policy.analyst_s3_readonly_access.arn
+  policy_arn = each.value
 }
-
-resource "aws_iam_group_policy_attachment" "analyst_athena_policy" {
-  group      = aws_iam_group.analysts.name
-  policy_arn = aws_iam_policy.analyst_athena_access.arn
-}
-
-resource "aws_iam_group_policy_attachment" "analyst_quicksight_policy" {
-  group      = aws_iam_group.analysts.name
-  policy_arn = aws_iam_policy.analyst_quicksight_access.arn
-}
-
-resource "aws_iam_group_policy_attachment" "analyst_cloudwatch_policy" {
-  group      = aws_iam_group.analysts.name
-  policy_arn = aws_iam_policy.cloudwatch_read_access.arn
-}
-
-

@@ -1,11 +1,16 @@
 module "policies" {
-  source = "./policies"
+  source      = "./policies"
   environment = var.environment
 }
 
 module "groups" {
-  source = "./groups"
+  source      = "./groups"
   environment = var.environment
+
+  developer_policy_arns  = module.policies.developer_policy_arns
+  analyst_policy_arns    = module.policies.analyst_policy_arns
+  finance_policy_arns    = module.policies.finance_policy_arns
+  operations_policy_arns = module.policies.operations_policy_arns
 }
 
 

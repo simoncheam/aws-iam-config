@@ -1,29 +1,14 @@
-# finance.tf
+# groups/finance.tf
 
 resource "aws_iam_group" "finance" {
   name = "${var.environment}-finance"
   path = "/groups/"
 }
 
-# Policy attachments for finance group
-resource "aws_iam_group_policy_attachment" "finance_cost_explorer_policy" {
+# Attach every policy passed in from the policies module
+resource "aws_iam_group_policy_attachment" "finance" {
+  for_each = var.finance_policy_arns
+
   group      = aws_iam_group.finance.name
-  policy_arn = aws_iam_policy.finance_cost_explorer_access.arn
+  policy_arn = each.value
 }
-
-resource "aws_iam_group_policy_attachment" "finance_budgets_policy" {
-  group      = aws_iam_group.finance.name
-  policy_arn = aws_iam_policy.finance_budgets_access.arn
-}
-
-resource "aws_iam_group_policy_attachment" "finance_billing_policy" {
-  group      = aws_iam_group.finance.name
-  policy_arn = aws_iam_policy.finance_billing_access.arn
-}
-
-resource "aws_iam_group_policy_attachment" "finance_readonly_policy" {
-  group      = aws_iam_group.finance.name
-  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
-}
-
-
