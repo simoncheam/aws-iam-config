@@ -1,5 +1,7 @@
 # security/password_policy.tf
 resource "aws_iam_account_password_policy" "strict" {
+  count = var.enable_password_policy ? 1 : 0
+
   minimum_password_length        = 12
   require_lowercase_characters   = true
   require_uppercase_characters   = true

@@ -13,6 +13,19 @@ module "groups" {
   operations_policy_arns = module.policies.operations_policy_arns
 }
 
+module "security" {
+  source      = "./security"
+  environment = var.environment
+
+  # Every group gets RequireMFA. Members without an MFA session are denied all actions
+  # except MFA setup, so keep admin/automation users out of these groups.
+  mfa_required_groups = {
+    developers = module.groups.developers_group_name
+    analysts   = module.groups.analysts_group_name
+    finance    = module.groups.finance_group_name
+    operations = module.groups.operations_group_name
+  }
+}
 
 # main.tf
 # This file can be used to tie everything together
