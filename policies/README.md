@@ -1,58 +1,21 @@
-# AWS IAM Policy Documentation
+# Policies module
 
-## Overview
+Creates the scoped IAM policies for each team. `outputs.tf` exposes their ARNs as one map per team, and the `groups` module attaches them. See the [main README](../README.md) for how the modules connect.
 
-This document outlines the IAM policies defined for different teams within our organization. These policies follow the principle of least privilege while enabling each team to perform their core responsibilities.
+| Team | Policy (`<env>-` prefix) | Actions | Resources |
+|---|---|---|---|
+| Developers | `DeveloperEC2Access` | `ec2:Describe*`, `RunInstances`, `StartInstances`, `StopInstances` | `*` |
+| Developers | `DeveloperS3Access` | `s3:GetObject`, `PutObject`, `ListBucket` | `app-files-bucket*` |
+| Developers | `CloudWatchReadAccess` | CloudWatch `Get*`/`List*`; Logs `Get*`/`List*`/`Describe*`, `StartQuery`, `StopQuery` | `*` |
+| Analysts | `AnalystS3ReadAccess` | `s3:GetObject`, `ListBucket` | `analytics-data-*`, `data-warehouse-*` |
+| Analysts | `AnalystAthenaAccess` | 6 named Athena query actions | `*` |
+| Analysts | `AnalystCloudWatchReadAccess` | CloudWatch `Get*`/`List*`/`Describe*` | `*` |
+| Finance | `FinanceCostExplorerAccess` | `ce:*`, 2 Cost and Usage Report read actions | `*` |
+| Finance | `FinanceBillingAccess` | View billing and usage; view budgets | `*` |
+| Finance | `FinanceReportsS3Access` | `s3:GetObject`, `ListBucket` | `finance-reports-*` |
+| Operations | `OperationsEC2FullAccess` | `ec2:*` | `*` |
+| Operations | `OperationsCloudWatchFullAccess` | `cloudwatch:*`, `logs:*`, `events:*` | `*` |
+| Operations | `OperationsLoadBalancerAccess` | `elasticloadbalancing:*` | `*` |
+| Operations | `OperationsSSMAccess` | `ssm:*` | `*` |
 
-## Last Updated
-
-YYYY-MM-DD
-
-## Team Policies
-
-### Analyst Team
-
-Designed for data analysis activities with controlled access to analytical resources.
-
-| Policy Name                 | Purpose                             | Access Level    |
-| --------------------------- | ----------------------------------- | --------------- |
-| AnalystS3ReadAccess         | Access to data in analytics buckets | Read-only       |
-| AnalystAthenaAccess         | Run queries against data            | Execute queries |
-| AnalystCloudWatchReadAccess | View system metrics                 | Read-only       |
-
-### Finance Team
-
-Focused on cost management and financial operations.
-
-| Policy Name               | Purpose                     | Access Level                |
-| ------------------------- | --------------------------- | --------------------------- |
-| FinanceCostExplorerAccess | Cost analysis and reporting | Full access to cost tools   |
-| FinanceBillingAccess      | View billing information    | Read-only                   |
-| FinanceReportsS3Access    | Access financial reports    | Read-only, targeted buckets |
-
-### Operations Team
-
-Enables infrastructure management and system reliability functions.
-
-| Policy Name                    | Purpose                              | Access Level |
-| ------------------------------ | ------------------------------------ | ------------ |
-| OperationsEC2FullAccess        | Manage compute resources             | Full access  |
-| OperationsCloudWatchFullAccess | Monitor and respond to system events | Full access  |
-| OperationsLoadBalancerAccess   | Manage request distribution          | Full access  |
-| OperationsSSMAccess            | System patching and management       | Full access  |
-
-## Policy Change Process
-
-1. Create PR with proposed policy changes
-2. Security team review
-3. Stakeholder approval
-4. Implementation in test environment
-5. Production deployment
-
-## Compliance Notes
-
-These policies are designed to comply with [relevant compliance frameworks].
-
-## Audit Information
-
-IAM policy usage is audited [frequency] by [team/tool].
+Developer, analyst, and finance policies list named actions and limit S3 to specific bucket patterns. Operations policies grant full access within each service.

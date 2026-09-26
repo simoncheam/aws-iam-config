@@ -1,168 +1,114 @@
-# AWS IAM Configuration
+# AWS IAM Groups with Terraform
 
-## Overview
+Terraform modules that create four role-based IAM groups (developers, analysts, finance, operations), attach scoped policies to each, require MFA for every group member, and set an account password policy.
 
-This repository contains Terraform code to manage AWS Identity and Access Management (IAM) resources. It implements infrastructure as code (IaC) principles to ensure consistent, version-controlled, and automated management of AWS permissions and security policies.
+**Status:** Live. Validated 2026-09-26: destroyed, rebuilt from an empty state, and checked with the IAM policy simulator (24/24 checks passed). `terraform fmt` and `terraform validate` run in GitHub Actions on every push and pull request.
+**Scope:** Personal hands-on AWS project. First built 2025-03-04, reworked 2026-09.
 
-![AWS IAM User Groups created by Terraform](docs/IAM_created_groups.png)
-_Example of IAM user groups created after applying this Terraform configuration_
+![IAM user groups created by Terraform](docs/IAM_created_groups.png)
+_The four groups in the IAM console after the first apply (2025-03-04)._
 
-## Table of Contents
-
-- [Purpose](#purpose)
-- [Repository Structure](#repository-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Setup](#setup)
-- [Workflow](#workflow)
-- [Key Concepts](#key-concepts)
-  - [Least Privilege](#least-privilege)
-  - [Naming Conventions](#naming-conventions)
-  - [Policy Structure](#policy-structure)
-- [Business Value](#business-value)
-- [Contributing](#contributing)
-- [Maintenance](#maintenance)
-
-## Purpose
-
-Managing AWS IAM through Terraform provides several benefits:
-
-- **Consistency**: All IAM configurations follow the same patterns and approval process
-- **Auditability**: All changes are tracked in version control
-- **Automation**: Reduces manual configuration errors
-- **Scalability**: Easily replicate permission models across accounts
-
-## Repository Structure
+## How it fits together
 
 ```
-aws-iam-config/
-├── docs/ # Documentation files
-│   ├── IAM_created_groups.png # Screenshot of created IAM groups
-│   └── README.md
-├── groups/ # IAM user group definitions
-│   ├── analysts.tf
-│   ├── developers.tf
-│   ├── finance.tf
-│   ├── operations.tf
-│   ├── outputs.tf
-│   ├── policies.tf
-│   └── variables.tf
-├── policies/ # IAM policy definitions
-│   ├── analyst_policies.tf
-│   ├── developer_policies.tf
-│   ├── finance_policies.tf
-│   ├── operations_policies.tf
-│   ├── README.md
-│   └── variables.tf
-├── security/ # Security configurations
-│   ├── mfa_policy.tf
-│   └── password_policy.tf
-├── terraform-iam-config/ # Main Terraform configuration
-│   ├── main.tf
-│   ├── outputs.tf
-│   ├── providers.tf
-│   ├── variables.tf
-│   └── terraform.lock.hcl
+main.tf
+├── module "policies"  (policies/)  creates 13 scoped policies, outputs their ARNs per team
+├── module "groups"    (groups/)    creates 4 groups, attaches the ARNs passed in from "policies"
+├── module "security"  (security/)  creates RequireMFA, attaches it to every group; account password policy
+└── aws_iam_user "dev-example"      demo user (no credentials) in the developers group
 ```
 
-## Getting Started
+## What it creates (38 resources)
 
-### Prerequisites
+| Resource | Count |
+|---|---|
+| IAM groups (`dev-developers`, `dev-analysts`, `dev-finance`, `dev-operations`) | 4 |
+| Scoped policies | 13 |
+| `dev-RequireMFA` policy | 1 |
+| Group policy attachments (13 scoped + 4 RequireMFA) | 17 |
+| Account password policy | 1 |
+| `dev-example` user + group membership | 2 |
 
-- [Terraform](https://www.terraform.io/downloads.html) (v1.0.0+)
-- AWS CLI configured with appropriate credentials
-- Basic understanding of AWS IAM concepts
+Names are prefixed with the `environment` variable (default `dev`).
 
-### Setup
+## Group permissions
 
-1. Clone this repository:
+| Group | Allowed | Scope |
+|---|---|---|
+| Developers | EC2 `Describe*`, `RunInstances`, `StartInstances`, `StopInstances`; S3 get/put/list; CloudWatch and Logs read | S3 limited to `app-files-bucket*` |
+| Analysts | S3 get/list; 6 named Athena query actions; CloudWatch read | S3 limited to `analytics-data-*` and `data-warehouse-*` |
+| Finance | Cost Explorer; view billing, usage, and budgets; S3 get/list | S3 limited to `finance-reports-*` |
+| Operations | Full access to EC2, CloudWatch/Logs/EventBridge, Elastic Load Balancing, and Systems Manager | Service-scoped (full access within each service) |
 
-   ```bash
-   git clone https://github.com/your-org/aws-iam-config.git
-   cd aws-iam-config
-   ```
+Every group also gets `RequireMFA`: without an MFA session, members are denied everything except setting up their own MFA device.
 
-2. Initialize Terraform:
+**Password policy (account-wide):** minimum 12 characters with upper, lower, number, and symbol; 90-day expiry; last 5 passwords can't be reused; users can change their own password.
 
-   ```bash
-   terraform init
-   ```
+## Design decisions
 
-3. Plan your changes:
+- **Modules connected through outputs and inputs.** `policies` outputs a map of ARNs per team; `groups` attaches whatever it receives. Adding a policy to a team means adding one map entry.
+- **Static map keys for `for_each`.** The ARNs aren't known until apply, but the keys (`ec2`, `s3`, …) are, so Terraform can plan the attachments on a fresh account.
+- **MFA enforced with an explicit Deny.** An explicit Deny overrides any Allow, so a group member without MFA can't use the group's permissions.
+- **Admin users stay out of these groups.** The same explicit Deny would block an administrator who isn't using an MFA session, including the user running Terraform.
+- **Password policy is optional** (`enable_password_policy`), because it applies to every IAM user in the account, not only these groups.
 
-   ```bash
-   terraform plan
-   ```
+## Deploy and validate
 
-4. Apply changes:
-   ```bash
-   terraform apply
-   ```
+**Prerequisites**
+- Terraform 1.5+ and the AWS CLI, with credentials that can manage IAM.
+- The user running Terraform must **not** be a member of these groups (see Design decisions).
+- No other users added to these groups by hand. Terraform only removes memberships it manages, and AWS won't delete a group that still has members.
 
-## Workflow
+**Steps and expected results**
 
-1. **Create branch**: Create a feature branch for your IAM changes
-2. **Make changes**: Modify the Terraform files according to requirements
-3. **Test locally**: Run `terraform plan` to preview changes
-4. **Create PR**: Submit a Pull Request for review
-5. **Review**: Peers review IAM changes for security and compliance
-6. **Merge**: After approval, merge changes to main branch
-7. **Deploy**: CI/CD pipeline applies changes to appropriate environments
+| Step | Command | Expected result |
+|---|---|---|
+| 1. Initialize | `terraform init` | Provider installed |
+| 2. Preview | `terraform plan` | `Plan: 38 to add, 0 to change, 0 to destroy` on an empty account |
+| 3. Deploy | `terraform apply` | `38 added` (about 5 seconds) |
+| 4. Check permissions | `./scripts/validate.sh` | `24 passed, 0 failed` (about 1 minute) |
+| 5. Check for drift | `terraform plan -detailed-exitcode` | Exit code `0` (no changes) |
+| 6. Tear down | `terraform destroy` | `38 destroyed`; the account password policy is removed |
 
-## Key Concepts
+`scripts/validate.sh` is read-only. It runs the IAM policy simulator against each group and checks three things: in-scope actions are allowed, out-of-scope actions are denied, and every action except MFA setup is denied without MFA.
 
-### Least Privilege
+**What to expect after deploying**
+- The password policy applies to **every IAM user in the account**. Users whose password is older than 90 days must set a new one at their next console sign-in.
+- Members of these groups can only use their permissions after signing in with MFA.
 
-This repository follows the principle of least privilege:
+**Validation record (2026-09-26)**
+- `terraform destroy`: 51 resources removed (the earlier wildcard-policy version) in 17 s. The account was checked afterwards: no groups, policies, demo user, or password policy remained.
+- `terraform apply` from an empty state: 38 resources in 4 s.
+- Drift check: no changes.
+- `scripts/validate.sh`: 24/24 passed.
 
-- Roles and policies grant only the minimum permissions required
-- Permissions are regularly reviewed and adjusted
-- Temporary credentials are used when possible
+## Known limitations
 
-### Naming Conventions
+- **Operations has full access within its four services** (for example, `ec2:*`). It's scoped by service, not by action.
+- **Athena needs more than the analyst policy grants.** Running queries also needs Glue Data Catalog read access and an S3 query-results location.
+- **The S3 bucket patterns are examples.** No buckets with those names exist in this project.
+- **Local state.** There's no remote backend or state locking, so this isn't set up for a team.
+- **One environment per account.** The password policy is an account-wide setting, so two environments in the same account would conflict over it.
 
-All resources follow consistent naming:
+## Next steps
+
+- Move state to an S3 backend with locking.
+- Add Glue and query-results permissions for analysts, and narrow operations to named actions.
+- Run `terraform plan` in CI with GitHub OIDC credentials instead of stored keys.
+- Add a policy linter such as `tflint` or `checkov`.
+
+## Repository structure
 
 ```
-{environment}-{service}-{purpose}
+├── main.tf, variables.tf, outputs.tf, providers.tf
+├── policies/      scoped IAM policies per team, outputs.tf exposes ARNs
+├── groups/        IAM groups and their policy attachments
+├── security/      RequireMFA policy and account password policy
+├── scripts/       validate.sh (policy simulator checks)
+├── docs/          screenshot
+└── .github/workflows/terraform.yml   fmt + validate on push and PR
 ```
-
-Example: `prod-ec2-readonlyaccess`
-
-### Policy Structure
-
-Policies are organized by:
-
-- Service-specific permissions
-- Read vs. write actions
-- Resource-level restrictions
-
-## Business Value
-
-- **Risk Reduction**: Enforces security best practices across all AWS accounts
-- **Compliance**: Helps maintain regulatory compliance through standardized access controls
-- **Operational Efficiency**: Reduces manual IAM administration overhead
-- **Onboarding Speed**: New projects can inherit pre-approved IAM configurations
-- **Incident Response**: Quick identification and remediation of inappropriate permissions
-
-## Contributing
-
-1. Review the [contribution guidelines](CONTRIBUTING.md)
-2. Ensure your changes meet security best practices
-3. Include tests for any new IAM configurations
-4. Update documentation to reflect your changes
-
-## Maintenance
-
-The IAM configurations should be regularly reviewed and updated:
-
-- Remove unused permissions and roles
-- Update policies based on AWS service changes
-- Conduct periodic access reviews
 
 ---
 
-For questions or comments, send me a message on [LinkedIn](https://www.linkedin.com/in/simoncheam/).
-
-Come Visit Me: [simoncheam.dev](https://simoncheam.dev)
-Connect With Me On LinkedIn: [https://www.linkedin.com/in/simoncheam/](https://www.linkedin.com/in/simoncheam/)
+[simoncheam.dev](https://simoncheam.dev) · [LinkedIn](https://www.linkedin.com/in/simoncheam/)
