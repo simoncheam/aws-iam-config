@@ -29,7 +29,7 @@ main.tf
 | Account password policy | 1 |
 | `dev-example` user + group membership | 2 |
 
-Names are prefixed with the `environment` variable (default `dev`).
+Group and policy names are prefixed with the `environment` variable (default `dev`). The demo user is always `dev-example`.
 
 ## Group permissions
 
@@ -40,7 +40,7 @@ Names are prefixed with the `environment` variable (default `dev`).
 | Finance | Cost Explorer; view billing, usage, and budgets; S3 get/list | S3 limited to `finance-reports-*` |
 | Operations | Full access to EC2, CloudWatch/Logs/EventBridge, Elastic Load Balancing, and Systems Manager | Service-scoped (full access within each service) |
 
-Every group also gets `RequireMFA`: without an MFA session, members are denied everything except setting up their own MFA device.
+Every group also gets `RequireMFA`: without an MFA session, members are denied everything except MFA setup, `iam:GetUser`, and `sts:GetSessionToken`.
 
 **Password policy (account-wide):** minimum 12 characters with upper, lower, number, and symbol; 90-day expiry; last 5 passwords can't be reused; users can change their own password.
 
@@ -50,12 +50,12 @@ Every group also gets `RequireMFA`: without an MFA session, members are denied e
 - **Static map keys for `for_each`.** The ARNs aren't known until apply, but the keys (`ec2`, `s3`, …) are, so Terraform can plan the attachments on a fresh account.
 - **MFA enforced with an explicit Deny.** An explicit Deny overrides any Allow, so a group member without MFA can't use the group's permissions.
 - **Admin users stay out of these groups.** The same explicit Deny would block an administrator who isn't using an MFA session, including the user running Terraform.
-- **Password policy is optional** (`enable_password_policy`), because it applies to every IAM user in the account, not only these groups.
+- **Password policy is optional.** The `security` module's `enable_password_policy` input defaults to `true`; set it to `false` in `main.tf` to leave the account policy alone. It's optional because it applies to every IAM user in the account, not only these groups.
 
-## Deploy and validate
+## How to use
 
 **Prerequisites**
-- Terraform 1.5+ and the AWS CLI, with credentials that can manage IAM.
+- Terraform 1.0+ (tested with 1.5.7, which CI uses) and the AWS CLI, with credentials that can manage IAM.
 - The user running Terraform must **not** be a member of these groups (see Design decisions).
 - No other users added to these groups by hand. Terraform only removes memberships it manages, and AWS won't delete a group that still has members.
 
@@ -65,7 +65,7 @@ Every group also gets `RequireMFA`: without an MFA session, members are denied e
 |---|---|---|
 | 1. Initialize | `terraform init` | Provider installed |
 | 2. Preview | `terraform plan` | `Plan: 38 to add, 0 to change, 0 to destroy` on an empty account |
-| 3. Deploy | `terraform apply` | `38 added` (about 5 seconds) |
+| 3. Deploy | `terraform apply` | `38 added` (a few seconds) |
 | 4. Check permissions | `./scripts/validate.sh` | `24 passed, 0 failed` (about 1 minute) |
 | 5. Check for drift | `terraform plan -detailed-exitcode` | Exit code `0` (no changes) |
 | 6. Tear down | `terraform destroy` | `38 destroyed`; the account password policy is removed |
@@ -75,6 +75,12 @@ Every group also gets `RequireMFA`: without an MFA session, members are denied e
 **What to expect after deploying**
 - The password policy applies to **every IAM user in the account**. Users whose password is older than 90 days must set a new one at their next console sign-in.
 - Members of these groups can only use their permissions after signing in with MFA.
+
+**Customize**
+- **Add a user to a group:** copy the `dev-example` block in `main.tf` (an `aws_iam_user` plus an `aws_iam_user_group_membership`) and point `groups` at the group output you want, for example `module.groups.analysts_group_name`. Create the user's console password or access keys outside Terraform so no credentials land in state.
+- **Change the name prefix:** `terraform apply -var environment=staging`. Because the password policy is account-wide, keep one environment per account (see Known limitations).
+- **Add a policy to a team:** add an `aws_iam_policy` in `policies/<team>_policies.tf`, then add one entry to that team's map in `policies/outputs.tf`. The `groups` module attaches it on the next apply.
+- **Skip the account password policy:** pass `enable_password_policy = false` to `module "security"` in `main.tf`.
 
 **Validation record (2026-09-26)**
 - `terraform destroy`: 51 resources removed (the earlier wildcard-policy version) in 17 s. The account was checked afterwards: no groups, policies, demo user, or password policy remained.
@@ -94,7 +100,7 @@ Every group also gets `RequireMFA`: without an MFA session, members are denied e
 
 - Move state to an S3 backend with locking.
 - Add Glue and query-results permissions for analysts, and narrow operations to named actions.
-- Run `terraform plan` in CI with GitHub OIDC credentials instead of stored keys.
+- Run `terraform plan` in CI using GitHub OIDC. CI currently runs only `fmt` and `validate`, with no AWS credentials.
 - Add a policy linter such as `tflint` or `checkov`.
 
 ## Repository structure
