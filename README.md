@@ -42,6 +42,8 @@ Group and policy names are prefixed with the `environment` variable (default `de
 
 Every group also gets `RequireMFA`: without an MFA session, members are denied everything except MFA setup, `iam:GetUser`, and `sts:GetSessionToken`.
 
+This is role-based access with enforced MFA, not least privilege: the developer, analyst, and finance policies name specific actions, but the operations group has service-wide access (`ec2:*`, `cloudwatch:*`, `logs:*`, `events:*`, `elasticloadbalancing:*`, `ssm:*`), and most policies apply to `Resource = "*"`.
+
 **Password policy (account-wide):** minimum 12 characters with upper, lower, number, and symbol; 90-day expiry; last 5 passwords can't be reused; users can change their own password.
 
 ## Design decisions
